@@ -1,0 +1,16 @@
+# Virtual environment
+.venv/
+
+# Model artifacts and data
+best_model.pkl
+*.pkl
+
+# Generated figures and results
+figures/
+results_metrics.csv
+
+# Python cache
+__pycache__/
+*.pyc
+
+
