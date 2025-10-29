@@ -1,16 +1,73 @@
-# Virtual environment
-.venv/
-
-# Model artifacts and data
-best_model.pkl
-*.pkl
-
-# Generated figures and results
-figures/
-results_metrics.csv
-
-# Python cache
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
 
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Model files (optional - you might want to keep these)
+*.pkl
+*.joblib
+
+# Data files
+*.csv
+*.json
+*.xlsx
+
+# Logs
+*.log
+
+# Streamlit
+.streamlit/
+
+# Node modules (for React assignment)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+build/
+dist/

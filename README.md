@@ -1,24 +1,45 @@
-# House Price Prediction using California Housing Dataset
+# California Housing Price Prediction
 
-A complete Machine Learning mini-project that predicts house price categories (Low/Medium/High) using the California Housing Prices dataset.
+A machine learning project that predicts house price categories (Low/Medium/High) using the California Housing dataset. The project includes a complete ML pipeline with EDA, model training, hyperparameter tuning, and a Streamlit web application.
 
-## Features
+## 🏠 Project Overview
 
-- **Complete ML Pipeline**: EDA, preprocessing, multiple classification algorithms
-- **8 Classification Models**: Logistic Regression, KNN, SVM, Decision Tree, Random Forest, Gradient Boosting, XGBoost, Naive Bayes
-- **Hyperparameter Tuning**: Optimized SVM, Random Forest, and XGBoost
-- **Interactive GUI**: Streamlit web app for easy predictions
-- **Performance Analysis**: Accuracy, precision, recall, F1-score, confusion matrices
+This project converts the continuous target variable (median house value) into three balanced categories and trains multiple classifiers to predict these categories. The best performing model is then deployed as an interactive Streamlit web application.
 
-## Quick Start
+## 📊 Features
 
-### 1. Install Dependencies
+- **Exploratory Data Analysis (EDA)**: Comprehensive visualizations and statistical analysis
+- **Multiple ML Models**: Logistic Regression, KNN, SVM, Decision Tree, Random Forest, Gradient Boosting, Naive Bayes, and XGBoost
+- **Hyperparameter Tuning**: Grid search optimization for SVM, Random Forest, and XGBoost
+- **Model Comparison**: Detailed evaluation metrics and confusion matrices
+- **Interactive Web App**: Streamlit-based GUI for real-time predictions
+- **Model Persistence**: Best model saved as pickle file for deployment
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python 3.8+
+- Required packages (see requirements.txt)
+
+### Installation
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/yourusername/california-housing-prediction.git
+cd california-housing-prediction
+```
+
+2. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Train the Model
+### Usage
+
+1. **Train the model**:
 
 ```bash
 python house_price_model.py
@@ -27,50 +48,117 @@ python house_price_model.py
 This will:
 
 - Load the California Housing dataset
-- Perform EDA and save visualizations
-- Train multiple classification models
-- Perform hyperparameter tuning
+- Perform EDA and save visualizations to `figures/` directory
+- Train multiple models and perform hyperparameter tuning
 - Save the best model as `best_model.pkl`
+- Generate evaluation metrics in `results_metrics.csv`
 
-### 3. Launch the GUI
+2. **Launch the web application**:
 
 ```bash
 streamlit run gui_app.py
 ```
 
-## Files
+The app will open in your browser at `http://localhost:8501`
 
-- `house_price_model.py` - Complete ML pipeline and model training
-- `gui_app.py` - Streamlit web interface for predictions
-- `requirements.txt` - Python dependencies
-- `best_model.pkl` - Trained model artifact (generated after training)
-- `figures/` - EDA and evaluation plots (generated after training)
-- `results_metrics.csv` - Model performance comparison (generated after training)
+## 📁 Project Structure
 
-## Model Performance
+```
+├── house_price_model.py      # Main ML training script
+├── gui_app.py               # Streamlit web application
+├── requirements.txt         # Python dependencies
+├── best_model.pkl          # Trained model (generated after training)
+├── results_metrics.csv     # Model evaluation results
+├── figures/                # EDA and evaluation visualizations
+│   ├── confusion_matrix_*.png
+│   ├── correlation_heatmap.png
+│   ├── feature_histograms.png
+│   └── model_comparison_accuracy.png
+├── assignment/             # React components (separate project)
+└── House_Price_Prediction/ # Alternative implementation
+```
 
-The script evaluates all models and selects the best performing one based on accuracy and F1-score. Typical results show tree-based ensemble methods (Random Forest, XGBoost) performing well on this tabular dataset.
+## 🎯 Model Performance
 
-## Deployment
+The project evaluates multiple models and selects the best performer based on accuracy and F1-score. Typical results show:
 
-For Streamlit Cloud deployment:
+- **Random Forest** and **XGBoost** often achieve the highest accuracy
+- **SVM** with tuning performs well on this dataset
+- All models are evaluated using stratified cross-validation
 
-1. Push this repository to GitHub
-2. Connect to Streamlit Cloud
-3. Deploy with the repository URL
-4. The app will automatically install dependencies and run
+## 🌐 Streamlit Deployment
 
-## Dataset
+### Deploy to Streamlit Cloud
 
-Uses the California Housing dataset from scikit-learn with 8 features:
+1. Push your code to GitHub
+2. Go to [share.streamlit.io](https://share.streamlit.io)
+3. Connect your GitHub repository
+4. Set the main file path to `gui_app.py`
+5. Deploy!
 
-- MedInc: Median income
-- HouseAge: House age
-- AveRooms: Average rooms per household
-- AveBedrms: Average bedrooms per household
-- Population: Block group population
-- AveOccup: Average occupants per household
-- Latitude: Geographic latitude
-- Longitude: Geographic longitude
+### Local Development
 
-The continuous target (median house value) is converted into 3 balanced categories using tertiles.
+```bash
+# Install Streamlit
+pip install streamlit
+
+# Run the app
+streamlit run gui_app.py
+```
+
+## 📈 Dataset Information
+
+The California Housing dataset contains 8 features:
+
+- **MedInc**: Median income in block group (in $10k)
+- **HouseAge**: Median house age
+- **AveRooms**: Average rooms per household
+- **AveBedrms**: Average bedrooms per household
+- **Population**: Block group population
+- **AveOccup**: Average occupants per household
+- **Latitude**: Geographic latitude
+- **Longitude**: Geographic longitude
+
+Target variable is converted to three categories:
+
+- **Low**: Bottom tertile of house values
+- **Medium**: Middle tertile of house values
+- **High**: Top tertile of house values
+
+## 🔧 Technical Details
+
+- **Framework**: scikit-learn, Streamlit
+- **Visualization**: matplotlib, seaborn
+- **Data Processing**: pandas, numpy
+- **Model Persistence**: joblib
+- **Hyperparameter Tuning**: GridSearchCV with stratified cross-validation
+
+## 📊 Evaluation Metrics
+
+- Accuracy
+- Precision (macro)
+- Recall (macro)
+- F1-score (macro)
+- Confusion matrices for each model
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📄 License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+## 👨‍💻 Author
+
+Your Name - [GitHub Profile](https://github.com/yourusername)
+
+## 🙏 Acknowledgments
+
+- California Housing dataset from scikit-learn
+- Streamlit for the web framework
+- scikit-learn for machine learning tools
