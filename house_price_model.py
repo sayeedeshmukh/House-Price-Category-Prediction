@@ -5,10 +5,10 @@ This script performs a complete ML mini-project:
  - Loads the California Housing dataset
  - EDA with visualizations saved as PNGs
  - Converts the continuous target into 3 categories: Low / Medium / High
- - Preprocesses data and evaluates multiple classifiers
- - Runs hyperparameter tuning for SVM and RandomForest (and XGBoost if available)
+ - Preprocesses data and evaluates compact tree-ensembles (Random Forest / Gradient Boosting)
+ - Runs a small hyperparameter search for RandomForest and GradientBoosting
  - Compares models with metrics and plots
- - Saves the best model pipeline to best_model.pkl for use by gui_app.py
+ - Saves the best compact model pipeline to best_model.pkl for use by gui_app.py
 
 Run directly:
   python house_price_model.py
@@ -40,20 +40,15 @@ from sklearn.metrics import (
     classification_report,
 )
 
-from sklearn.linear_model import LogisticRegression
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
 
-
-# Optional XGBoost
-try:
-    from xgboost import XGBClassifier  # type: ignore
-    XGBOOST_AVAILABLE = True
-except Exception:
-    XGBOOST_AVAILABLE = False
+ 
+XGBOOST_AVAILABLE = False # Explicitly disabled to keep model artifacts small
 
 
 warnings.filterwarnings("ignore")
@@ -131,26 +126,28 @@ def run_eda(X: pd.DataFrame, y_cont: pd.Series, y_cat: pd.Series, figures_dir: s
 
 
 def build_models() -> Dict[str, Any]:
+    # Keep models compact to ensure small artifact size
     models: Dict[str, Any] = {
-        "Logistic Regression": LogisticRegression(max_iter=1000, multi_class="auto"),
-        "KNN": KNeighborsClassifier(n_neighbors=7),
-        "SVM": SVC(kernel="rbf", C=1.0, gamma="scale", probability=True),
-        "Decision Tree": DecisionTreeClassifier(random_state=42, max_depth=10),
-        "Random Forest": RandomForestClassifier(n_estimators=50, max_depth=8, random_state=42),
-        "Gradient Boosting": GradientBoostingClassifier(n_estimators=50, max_depth=4, random_state=42),
+        # Linear / distance-based
+        "Logistic Regression": LogisticRegression(max_iter=800, n_jobs=None),
+        "SVM": SVC(kernel="rbf", C=1.0, gamma="scale"),
+        "KNN": KNeighborsClassifier(n_neighbors=7, weights="distance"),
         "Naive Bayes": GaussianNB(),
-    }
-    if XGBOOST_AVAILABLE:
-        models["XGBoost"] = XGBClassifier(
-            n_estimators=50,
-            max_depth=3,
-            learning_rate=0.1,
-            subsample=0.9,
-            colsample_bytree=0.9,
-            objective="multi:softprob",
-            eval_metric="mlogloss",
+        # Tree-based
+        "Decision Tree": DecisionTreeClassifier(random_state=42, max_depth=6),
+        "Random Forest": RandomForestClassifier(
+            n_estimators=30,  # smaller forest
+            max_depth=6,
+            max_features="sqrt",
             random_state=42,
-        )
+        ),
+        "Gradient Boosting": GradientBoostingClassifier(
+            n_estimators=60,  # modest number of trees
+            learning_rate=0.08,
+            max_depth=3,
+            random_state=42,
+        ),
+    }
     return models
 
 
@@ -191,25 +188,36 @@ def evaluate_model(name: str, pipeline: Pipeline, X_test: pd.DataFrame, y_test: 
 
 
 def hyperparameter_tuning(models: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    """Return param grids keyed by model name for GridSearchCV on the pipeline's 'clf__' params."""
-    grids: Dict[str, Dict[str, Any]] = {
-        "SVM": {
+    """Compact grids for small, fast artifacts."""
+    grids: Dict[str, Dict[str, Any]] = {}
+
+    if "SVM" in models:
+        grids["SVM"] = {
             "clf__C": [0.5, 1.0],
-            "clf__gamma": ["scale", 0.1],
+            "clf__gamma": ["scale", 0.05],
             "clf__kernel": ["rbf"],
-        },
-        "Random Forest": {
-            "clf__n_estimators": [30, 50],
-            "clf__max_depth": [6, 8],
-            "clf__max_features": ["sqrt", 0.7],
-        },
-    }
-    if XGBOOST_AVAILABLE and ("XGBoost" in models):
-        grids["XGBoost"] = {
-            "clf__n_estimators": [30, 50],
-            "clf__max_depth": [3, 4],
-            "clf__learning_rate": [0.1, 0.15],
         }
+
+    if "KNN" in models:
+        grids["KNN"] = {
+            "clf__n_neighbors": [5, 7, 9],
+            "clf__weights": ["uniform", "distance"],
+        }
+
+    if "Random Forest" in models:
+        grids["Random Forest"] = {
+            "clf__n_estimators": [25, 35],
+            "clf__max_depth": [5, 7],
+            "clf__max_features": ["sqrt", 0.8],
+        }
+
+    if "Gradient Boosting" in models:
+        grids["Gradient Boosting"] = {
+            "clf__n_estimators": [50, 70],
+            "clf__learning_rate": [0.06, 0.1],
+            "clf__max_depth": [2, 3],
+        }
+
     return grids
 
 
@@ -231,7 +239,7 @@ def main() -> None:
     print("Building models...")
     base_models = build_models()
 
-    # Fit base models
+    # Fit base models (only compact ensembles and a shallow tree)
     results: List[Dict[str, Any]] = []
     fitted_pipelines: Dict[str, Pipeline] = {}
 
@@ -243,18 +251,31 @@ def main() -> None:
         results.append(res)
         fitted_pipelines[name] = pipeline
 
-    # Hyperparameter tuning (SVM, RandomForest, XGBoost if available)
-    print("Starting hyperparameter tuning (this may take a few minutes)...")
-    grids = hyperparameter_tuning(base_models)
-    cv = StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
+    # Select best baseline by Accuracy then F1 and tune only that model
+    base_df = pd.DataFrame([
+        {
+            "Model": r["model"],
+            "Accuracy": r["accuracy"],
+            "Precision (macro)": r["precision_macro"],
+            "Recall (macro)": r["recall_macro"],
+            "F1 (macro)": r["f1_macro"],
+        }
+        for r in results
+    ])
+    base_df.sort_values(by=["Accuracy", "F1 (macro)"], ascending=[False, False], inplace=True)
+    best_baseline_name = str(base_df.iloc[0]["Model"])
+    print(f"Best baseline model: {best_baseline_name}")
 
+    # Try tuning only the best baseline model
     tuned_results: List[Dict[str, Any]] = []
-    for name, grid in grids.items():
-        print(f"Grid search for: {name}")
-        pipeline = build_pipeline(base_models[name])
+    grids = hyperparameter_tuning(base_models)
+    if best_baseline_name in grids:
+        print(f"Tuning best model: {best_baseline_name}")
+        cv = StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
+        pipeline = build_pipeline(base_models[best_baseline_name])
         gs = GridSearchCV(
             estimator=pipeline,
-            param_grid=grid,
+            param_grid=grids[best_baseline_name],
             scoring="accuracy",
             cv=cv,
             n_jobs=-1,
@@ -262,11 +283,11 @@ def main() -> None:
         )
         gs.fit(X_train, y_train)
         best_pipeline: Pipeline = gs.best_estimator_
-        print(f"  Best params for {name}: {gs.best_params_}")
-        res = evaluate_model(f"{name} (Tuned)", best_pipeline, X_test, y_test, figures_dir)
+        print(f"  Best params for {best_baseline_name}: {gs.best_params_}")
+        res = evaluate_model(f"{best_baseline_name} (Tuned)", best_pipeline, X_test, y_test, figures_dir)
         res["best_params"] = gs.best_params_
         tuned_results.append(res)
-        fitted_pipelines[f"{name} (Tuned)"] = best_pipeline
+        fitted_pipelines[f"{best_baseline_name} (Tuned)"] = best_pipeline
 
     all_results = results + tuned_results
 
@@ -310,7 +331,7 @@ def main() -> None:
     # Save with maximum compression to keep artifact size under 100MB
     joblib.dump(artifact, "best_model.pkl", compress=9)
 
-    print("\n===== SUMMARY =====")
+    print("\n SUMMARY ")
     print(results_df.to_string(index=False))
     print("\nBest model:", best_model_name)
     # Short conclusion

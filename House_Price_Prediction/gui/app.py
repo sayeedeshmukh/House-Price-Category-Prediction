@@ -73,3 +73,6 @@ if st.button("Predict Price Category", type="primary"):
 
 st.info("Tip: Adjust the sliders on the left and click Predict.")
 
+
+
+

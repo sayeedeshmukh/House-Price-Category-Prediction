@@ -1,18 +1,15 @@
 import warnings
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict
 
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report
 from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.svm import SVC
@@ -51,8 +48,6 @@ TARGET_COLUMN = "PriceCategory"
 
 
 def build_models() -> Dict[str, Pipeline]:
-    numeric = FEATURE_COLUMNS
-
     scale_then = [
         ("scaler", StandardScaler()),
     ]
@@ -62,7 +57,6 @@ def build_models() -> Dict[str, Pipeline]:
         "KNN": Pipeline(scale_then + [("clf", KNeighborsClassifier())]),
         "SVM": Pipeline(scale_then + [("clf", SVC(probability=True))]),
         "GaussianNB": Pipeline(scale_then + [("clf", GaussianNB())]),
-        "ANN": Pipeline(scale_then + [("clf", MLPClassifier(hidden_layer_sizes=(64, 32), max_iter=500))]),
         "DecisionTree": Pipeline([("clf", DecisionTreeClassifier(random_state=42))]),
         "RandomForest": Pipeline([("clf", RandomForestClassifier(random_state=42))]),
         "GradientBoosting": Pipeline([("clf", GradientBoostingClassifier(random_state=42))]),
@@ -90,7 +84,7 @@ def build_models() -> Dict[str, Pipeline]:
                 )
             ]
         )
-    except Exception:  # pragma: no cover
+    except Exception:
         pass
 
     return models
@@ -98,13 +92,32 @@ def build_models() -> Dict[str, Pipeline]:
 
 def build_param_grids() -> Dict[str, Dict]:
     grids: Dict[str, Dict] = {
+        # Keep grids compact to control runtime
         "SVM": {
-            "clf__C": [0.1, 1, 10],
-            "clf__gamma": ["scale", 0.01, 0.1],
-            "clf__kernel": ["rbf", "poly"],
+            "clf__C": [0.1, 1.0],
+            "clf__gamma": ["scale", 0.01],
+            "clf__kernel": ["rbf"],
         },
         "RandomForest": {
             "clf__n_estimators": [100, 200],
+            "clf__max_depth": [None, 15],
+            "clf__min_samples_split": [2, 5],
+        },
+        "KNN": {
+            "clf__n_neighbors": [5, 7, 9],
+            "clf__weights": ["uniform", "distance"],
+        },
+        "LogReg": {
+            "clf__C": [0.1, 1.0],
+            "clf__solver": ["lbfgs"],
+            "clf__penalty": ["l2"],
+        },
+        "GradientBoosting": {
+            "clf__n_estimators": [100, 200],
+            "clf__learning_rate": [0.05, 0.1],
+            "clf__max_depth": [2, 3],
+        },
+        "DecisionTree": {
             "clf__max_depth": [None, 10, 20],
             "clf__min_samples_split": [2, 5],
         },
@@ -140,27 +153,10 @@ def main():
     model_metrics: Dict[str, Dict[str, float]] = {}
     model_objects: Dict[str, Pipeline] = {}
 
-    # Train baseline models and tune selected ones
+    # Train baseline models only (no tuning here)
     for name, pipeline in models.items():
         print(f"Training {name}...")
-
-        if name in grids:
-            grid = grids[name]
-            gs = GridSearchCV(
-                estimator=pipeline,
-                param_grid=grid,
-                scoring="f1_weighted",
-                cv=cv,
-                n_jobs=-1,
-                verbose=0,
-                refit=True,
-            )
-            gs.fit(X_train, y_train)
-            best_estimator = gs.best_estimator_
-            print(f"{name} best params: {gs.best_params_}")
-            model = best_estimator
-        else:
-            model = pipeline.fit(X_train, y_train)
+        model = pipeline.fit(X_train, y_train)
 
         y_pred = model.predict(X_test)
         metrics = compute_basic_metrics(y_test, y_pred)
@@ -168,16 +164,43 @@ def main():
         model_objects[name] = model
         print(f"{name} metrics: {metrics}")
 
-    # Save metrics table
-    metrics_df = pd.DataFrame(model_metrics).T.sort_values("f1_weighted", ascending=False)
+    # Determine best baseline model by F1-weighted
+    metrics_df = pd.DataFrame(model_metrics).T
+    metrics_df.sort_values("f1_weighted", ascending=False, inplace=True)
+    best_name = metrics_df.index[0]
+    best_model = model_objects[best_name]
+    print(f"Best baseline model: {best_name}")
+
+    # Hyperparameter tuning ONLY for the best baseline model
+    if best_name in grids:
+        print(f"Tuning best model: {best_name}")
+        grid = grids[best_name]
+        gs = GridSearchCV(
+            estimator=models[best_name],
+            param_grid=grid,
+            scoring="f1_weighted",
+            cv=cv,
+            n_jobs=-1,
+            verbose=0,
+            refit=True,
+        )
+        gs.fit(X_train, y_train)
+        best_model = gs.best_estimator_
+        print(f"{best_name} tuned best params: {gs.best_params_}")
+        # Evaluate tuned best on test set and replace metrics
+        y_best_pred = best_model.predict(X_test)
+        tuned_metrics = compute_basic_metrics(y_test, y_best_pred)
+        model_metrics[best_name] = tuned_metrics
+        model_objects[best_name] = best_model
+
+        # Recompute metrics df after tuning update
+        metrics_df = pd.DataFrame(model_metrics).T
+        metrics_df.sort_values("f1_weighted", ascending=False, inplace=True)
+
+    # Save metrics table after potential tuning
     metrics_csv = DATA_DIR / "model_metrics.csv"
     metrics_df.to_csv(metrics_csv)
     print(f"Saved metrics: {metrics_csv}")
-
-    # Determine best model by F1-weighted
-    best_name = metrics_df.index[0]
-    best_model = model_objects[best_name]
-    print(f"Best model: {best_name}")
 
     # Save performance comparison chart
     perf_chart = SCREENSHOTS_DIR / "performance_comparison.png"
@@ -195,7 +218,6 @@ def main():
 
     # Feature importance if available
     try:
-        # Try to get feature importances from underlying estimator
         importances = None
         if hasattr(best_model, "named_steps") and "clf" in best_model.named_steps:
             clf = best_model.named_steps["clf"]
@@ -225,4 +247,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

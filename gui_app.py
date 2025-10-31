@@ -1,14 +1,6 @@
 """
-Streamlit GUI for House Price Category Prediction (California Housing Dataset)
-
-Usage:
-  1) Train and produce best_model.pkl by running:
        python house_price_model.py
-  2) Launch the GUI:
        streamlit run gui_app.py
-
-This app loads best_model.pkl (a scikit-learn Pipeline with StandardScaler + best classifier)
-and lets you enter the eight features to predict Low / Medium / High category.
 """
 
 import os
@@ -156,6 +148,8 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
 
 
 
